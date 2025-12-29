@@ -6,6 +6,11 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		9F18940F2F00FF2C00EEF300 /* YoutubeTranscript in Frameworks */ = {isa = PBXBuildFile; productRef = 9F6C84712F00D00000ECDE37 /* YoutubeTranscript */; };
+		9F18944C2F020D1500EEF300 /* Porcupine in Frameworks */ = {isa = PBXBuildFile; productRef = 9F18944B2F020D1500EEF300 /* Porcupine */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		9F6C843F2F00BBAE00ECDE37 /* Pod AI.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Pod AI.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -23,6 +28,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				9F18944C2F020D1500EEF300 /* Porcupine in Frameworks */,
+				9F18940F2F00FF2C00EEF300 /* YoutubeTranscript in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -65,6 +72,8 @@
 			);
 			name = "Pod AI";
 			packageProductDependencies = (
+				9F6C84712F00D00000ECDE37 /* YoutubeTranscript */,
+				9F18944B2F020D1500EEF300 /* Porcupine */,
 			);
 			productName = "Pod AI";
 			productReference = 9F6C843F2F00BBAE00ECDE37 /* Pod AI.app */;
@@ -94,6 +103,10 @@
 			);
 			mainGroup = 9F6C84362F00BBAE00ECDE37;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				9F6C84702F00D00000ECDE37 /* XCRemoteSwiftPackageReference "swift-youtube-transcript" */,
+				9F18944A2F020D1500EEF300 /* XCRemoteSwiftPackageReference "porcupine" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 9F6C84402F00BBAE00ECDE37 /* Products */;
 			projectDirPath = "";
@@ -256,6 +269,8 @@
 				DEVELOPMENT_TEAM = 39QYXNZ8BL;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Pod-AI-Info.plist";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Pod AI needs microphone access to let you ask questions about the podcast using your voice";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -288,6 +303,8 @@
 				DEVELOPMENT_TEAM = 39QYXNZ8BL;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Pod-AI-Info.plist";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Pod AI needs microphone access to let you ask questions about the podcast using your voice";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -332,6 +349,38 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		9F18944A2F020D1500EEF300 /* XCRemoteSwiftPackageReference "porcupine" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/Picovoice/porcupine.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 4.0.0;
+			};
+		};
+		9F6C84702F00D00000ECDE37 /* XCRemoteSwiftPackageReference "swift-youtube-transcript" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/spaceman1412/swift-youtube-transcript.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		9F18944B2F020D1500EEF300 /* Porcupine */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9F18944A2F020D1500EEF300 /* XCRemoteSwiftPackageReference "porcupine" */;
+			productName = Porcupine;
+		};
+		9F6C84712F00D00000ECDE37 /* YoutubeTranscript */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9F6C84702F00D00000ECDE37 /* XCRemoteSwiftPackageReference "swift-youtube-transcript" */;
+			productName = YoutubeTranscript;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 9F6C84372F00BBAE00ECDE37 /* Project object */;
 }

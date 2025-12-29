@@ -1,0 +1,33 @@
+{
+  "originHash" : "7f21dbfcb0a9e83ecf6f00790c92ec3c36bb04b3c2e7794b19ef37a1020926a7",
+  "pins" : [
+    {
+      "identity" : "ios-voice-processor",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/Picovoice/ios-voice-processor.git",
+      "state" : {
+        "revision" : "083c02aed9a890400d647fd357f8a505bf672f58",
+        "version" : "1.2.0"
+      }
+    },
+    {
+      "identity" : "porcupine",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/Picovoice/porcupine.git",
+      "state" : {
+        "revision" : "c794ad57b189f4b06e8128abd0324ad09e1a424d",
+        "version" : "4.0.0"
+      }
+    },
+    {
+      "identity" : "swift-youtube-transcript",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/spaceman1412/swift-youtube-transcript.git",
+      "state" : {
+        "revision" : "e6fb610ee78d5dff8c8c81589875d43cbc9ef856",
+        "version" : "1.0.0"
+      }
+    }
+  ],
+  "version" : 3
+}
