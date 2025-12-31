@@ -7,11 +7,17 @@ import SwiftUI
 
 struct VoiceInteractionView: View {
     @EnvironmentObject var audioPlayer: AudioPlayerService
+    @Environment(TakeawayService.self) private var takeawayService
     @StateObject private var realtimeService = OpenAIRealtimeService()
     @Environment(\.dismiss) private var dismiss
 
     var transcript: String = ""
     var onDismiss: (() -> Void)? = nil
+
+    @State private var showCTA = false
+    @State private var showToast = false
+    @State private var ctaTimer: Timer?
+    @State private var lastQuestionText: String = ""
 
     var body: some View {
         VStack(spacing: 24) {
@@ -70,6 +76,25 @@ struct VoiceInteractionView: View {
                     .multilineTextAlignment(.center)
             }
 
+            // Ephemeral "Add to Takeaways" CTA
+            if showCTA && !realtimeService.pendingTakeaways.isEmpty {
+                Button(action: addTakeaways) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "bookmark.fill")
+                            .font(.subheadline)
+                        Text("Add to Takeaways")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 12)
+                    .background(Color.orange.opacity(0.9))
+                    .cornerRadius(24)
+                }
+                .transition(.opacity.combined(with: .scale(scale: 0.9)))
+            }
+
             // Voice animation / status
             ZStack {
                 // Animated rings
@@ -116,11 +141,53 @@ struct VoiceInteractionView: View {
                 .padding(.horizontal)
         }
         .background(Color.black)
+        .overlay(alignment: .bottom) {
+            // Toast overlay
+            if showToast {
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                    Text("Added to Takeaways")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .background(Color.gray.opacity(0.9))
+                .cornerRadius(24)
+                .padding(.bottom, 100)
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
+            }
+        }
+        .animation(.easeInOut(duration: 0.3), value: showCTA)
+        .animation(.easeInOut(duration: 0.3), value: showToast)
         .onAppear {
             connectToRealtime()
         }
         .onDisappear {
+            ctaTimer?.invalidate()
             realtimeService.disconnect()
+        }
+        .onChange(of: realtimeService.hasCompletedResponse) { _, hasCompleted in
+            if hasCompleted && !realtimeService.pendingTakeaways.isEmpty {
+                // Capture the question text before showing CTA
+                lastQuestionText = realtimeService.transcribedText
+
+                // Show CTA with animation
+                withAnimation {
+                    showCTA = true
+                }
+
+                // Auto-hide after 2.5 seconds
+                ctaTimer?.invalidate()
+                ctaTimer = Timer.scheduledTimer(withTimeInterval: 2.5, repeats: false) { _ in
+                    withAnimation {
+                        showCTA = false
+                    }
+                    realtimeService.clearPendingTakeaways()
+                }
+            }
         }
     }
 
@@ -234,9 +301,72 @@ struct VoiceInteractionView: View {
         }
         dismiss()
     }
+
+    private func addTakeaways() {
+        guard let episodeId = audioPlayer.currentEpisode?.id else { return }
+
+        // Cancel the auto-hide timer
+        ctaTimer?.invalidate()
+
+        // Get transcript snippet around current time
+        let transcriptSnippet = getTranscriptSnippet()
+
+        // Save each takeaway candidate
+        for text in realtimeService.pendingTakeaways {
+            let takeaway = Takeaway(
+                episodeId: episodeId,
+                text: text,
+                timestamp: audioPlayer.currentTime,
+                sourceType: .question,
+                transcriptSnippet: transcriptSnippet,
+                questionText: lastQuestionText.isEmpty ? nil : lastQuestionText
+            )
+            takeawayService.addTakeaway(takeaway)
+        }
+
+        // Hide CTA and show toast
+        withAnimation {
+            showCTA = false
+            showToast = true
+        }
+
+        // Clear pending takeaways
+        realtimeService.clearPendingTakeaways()
+
+        // Haptic feedback
+        let generator = UINotificationFeedbackGenerator()
+        generator.notificationOccurred(.success)
+
+        // Hide toast after 1.5 seconds
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            withAnimation {
+                showToast = false
+            }
+        }
+    }
+
+    private func getTranscriptSnippet() -> String? {
+        guard !transcript.isEmpty else { return nil }
+
+        // Get ~200 chars around the current position (rough estimate based on time)
+        let totalDuration = audioPlayer.duration
+        guard totalDuration > 0 else { return String(transcript.prefix(200)) }
+
+        let progress = audioPlayer.currentTime / totalDuration
+        let estimatedPosition = Int(Double(transcript.count) * progress)
+
+        let start = max(0, estimatedPosition - 100)
+        let end = min(transcript.count, estimatedPosition + 100)
+
+        let startIndex = transcript.index(transcript.startIndex, offsetBy: start)
+        let endIndex = transcript.index(transcript.startIndex, offsetBy: end)
+
+        return String(transcript[startIndex..<endIndex])
+    }
 }
 
 #Preview {
     VoiceInteractionView()
         .environmentObject(AudioPlayerService())
+        .environment(TakeawayService())
 }

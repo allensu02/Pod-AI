@@ -33,6 +33,8 @@ class OpenAIRealtimeService: NSObject, ObservableObject {
     @Published var voiceState: RealtimeVoiceState = .idle
     @Published var transcribedText: String = ""
     @Published var responseText: String = ""
+    @Published var pendingTakeaways: [String] = []
+    @Published var hasCompletedResponse: Bool = false
 
     private var webSocket: URLSessionWebSocketTask?
     private var urlSession: URLSession!
@@ -99,8 +101,15 @@ class OpenAIRealtimeService: NSObject, ObservableObject {
         self.onResponseComplete = onResponseComplete
         self.responseComplete = false
         self.hasCalledCompletion = false
+        self.hasCompletedResponse = false
+        self.pendingTakeaways = []
         voiceState = .listening
         startAudioCapture()
+    }
+
+    func clearPendingTakeaways() {
+        pendingTakeaways = []
+        hasCompletedResponse = false
     }
 
     func stopListening() {
@@ -149,6 +158,22 @@ class OpenAIRealtimeService: NSObject, ObservableObject {
                         ]
                     ]
                 ]
+            ],
+            [
+                "type": "function",
+                "name": "provide_takeaways",
+                "description": "After answering a question, provide 1-2 one-line takeaway candidates that distill the key insight. Call this AFTER speaking your answer. If the question covers one topic, provide 1 takeaway. If it covers two distinct topics, provide 2 (max).",
+                "parameters": [
+                    "type": "object",
+                    "properties": [
+                        "candidates": [
+                            "type": "array",
+                            "items": ["type": "string"],
+                            "description": "1-2 one-line assertive claims distilled from your answer. Each should be memorable, specific, and under 15 words. May include a short impactful quote if truly striking."
+                        ]
+                    ],
+                    "required": ["candidates"]
+                ]
             ]
         ]
 
@@ -175,16 +200,24 @@ class OpenAIRealtimeService: NSObject, ObservableObject {
                     TRANSCRIPT:
                     \(transcriptContext)
 
-                    RULES:
-                    - Be extremely concise: 1-2 sentences max
-                    - No filler phrases ("Great question", "Let me explain", "I'd be happy to")
-                    - Answer directly, then ask "Any other questions?"
-                    - If transcript is unavailable or question not covered, say "I don't have that information for this episode"
-                    - If user says "no", "nope", "I'm good", "that's it" → call resume_podcast immediately
+                    RESPONSE FORMAT:
+                    - 1 sentence summary, then max 2 bullets if needed
+                    - Use grounding: "At this point in the episode..." or "The guest mentions..."
+                    - No filler phrases ("Great question", "Let me explain")
+                    - After answering, ask "Any other questions?"
 
-                    FUNCTIONS - use immediately when triggered:
-                    - resume_podcast: "go back", "resume", "done", "no", "nope", "I'm good", "that's it" → call without speaking
+                    TAKEAWAYS:
+                    - After EVERY answer, call provide_takeaways with 1-2 distilled claims
+                    - Each takeaway: one assertive line, max 15 words
+                    - If question covers 1 topic → 1 takeaway. If 2 distinct topics → 2 takeaways (max)
+                    - May include a short impactful quote if truly memorable
+
+                    FUNCTIONS:
+                    - resume_podcast: user says "go back", "resume", "done", "no", "nope", "I'm good" → call immediately without speaking
                     - skip_forward/skip_backward: "skip", "rewind", "go back X seconds" → call without speaking
+                    - provide_takeaways: call AFTER speaking your answer, with distilled insight(s)
+
+                    If transcript unavailable or question not covered: "I don't have that information for this episode"
                     """,
                 "voice": "alloy",
                 "speed": 1.5,
@@ -333,8 +366,16 @@ class OpenAIRealtimeService: NSObject, ObservableObject {
                         args = parsed
                     }
 
-                    // Call the function handler
-                    self?.onFunctionCall?(name, args)
+                    // Handle provide_takeaways internally
+                    if name == "provide_takeaways" {
+                        if let candidates = args["candidates"] as? [String] {
+                            self?.pendingTakeaways = Array(candidates.prefix(2)) // Max 2
+                            print("📝 [DEBUG] Received takeaway candidates: \(candidates)")
+                        }
+                    } else {
+                        // Call the function handler for other functions
+                        self?.onFunctionCall?(name, args)
+                    }
 
                     // Reset
                     self?.currentFunctionName = ""
@@ -348,6 +389,10 @@ class OpenAIRealtimeService: NSObject, ObservableObject {
                 if self?.isPlayingAudio == false && self?.hasCalledCompletion == false {
                     self?.hasCalledCompletion = true
                     self?.voiceState = .idle
+                    // Mark response as complete if we have pending takeaways (for CTA display)
+                    if !(self?.pendingTakeaways.isEmpty ?? true) {
+                        self?.hasCompletedResponse = true
+                    }
                     self?.onResponseComplete?()
                 }
 

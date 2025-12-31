@@ -8,8 +8,12 @@ import SwiftUI
 struct NowPlayingView: View {
     @EnvironmentObject var audioPlayer: AudioPlayerService
     @Environment(\.dismiss) private var dismiss
+    @Environment(TakeawayService.self) private var takeawayService
     @StateObject private var realtimeService = OpenAIRealtimeService()
     @State private var isVoiceInteractionActive = false
+    @State private var showTakeawaysSheet = false
+    @State private var showToast = false
+    @State private var isBookmarking = false
 
     var body: some View {
         ZStack {
@@ -160,11 +164,18 @@ struct NowPlayingView: View {
 
                     // Bottom toolbar with AI voice button
                     HStack(spacing: 48) {
-                        Button(action: {}) {
-                            Image(systemName: "quote.opening")
-                                .font(.title2)
-                                .foregroundColor(.gray)
+                        Button(action: addBookmark) {
+                            if isBookmarking {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .gray))
+                                    .scaleEffect(0.8)
+                            } else {
+                                Image(systemName: "bookmark")
+                                    .font(.title2)
+                                    .foregroundColor(.gray)
+                            }
                         }
+                        .disabled(isBookmarking || audioPlayer.currentTranscript.isEmpty)
 
                         // AI Voice Button
                         GlowyMicButton(
@@ -176,16 +187,48 @@ struct NowPlayingView: View {
                         )
                         .scaleEffect(1.4) // Larger in NowPlayingView
 
-                        Button(action: {}) {
-                            Image(systemName: "list.bullet")
-                                .font(.title2)
-                                .foregroundColor(.gray)
+                        Button(action: {
+                            showTakeawaysSheet = true
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "bookmark.fill")
+                                    .font(.title2)
+                                if takeawayService.takeaways.count > 0 {
+                                    Text("\(takeawayService.takeaways.count)")
+                                        .font(.caption)
+                                        .fontWeight(.medium)
+                                }
+                            }
+                            .foregroundColor(takeawayService.takeaways.isEmpty ? .gray : .orange)
                         }
                     }
                     .padding(.bottom, 40)
                 }
             }
         }
+        .sheet(isPresented: $showTakeawaysSheet) {
+            TakeawaysSheet(episodeName: audioPlayer.currentEpisode?.title ?? "Episode")
+        }
+        .overlay(alignment: .top) {
+            // Toast overlay
+            if showToast {
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                    Text("Added to Takeaways")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .background(Color.black.opacity(0.8))
+                .cornerRadius(24)
+                .padding(.top, 60)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .animation(.easeInOut(duration: 0.3), value: showToast)
         .gesture(
             DragGesture()
                 .onEnded { value in
@@ -196,6 +239,9 @@ struct NowPlayingView: View {
         )
         .onAppear {
             setupFunctionCallHandler()
+            if let episodeId = audioPlayer.currentEpisode?.id {
+                takeawayService.loadTakeaways(for: episodeId)
+            }
         }
         .onDisappear {
             if isVoiceInteractionActive {
@@ -275,9 +321,85 @@ struct NowPlayingView: View {
             startVoiceInteraction()
         }
     }
+
+    // MARK: - Bookmark
+
+    private func addBookmark() {
+        guard let episodeId = audioPlayer.currentEpisode?.id,
+              !audioPlayer.currentTranscript.isEmpty else { return }
+
+        isBookmarking = true
+
+        // Get transcript snippet around current time
+        let snippet = getTranscriptSnippet()
+
+        Task {
+            do {
+                // Distill the snippet into a one-line takeaway
+                let distilledText = try await takeawayService.distillTakeaway(from: snippet)
+
+                // Create and save the takeaway
+                let takeaway = Takeaway(
+                    episodeId: episodeId,
+                    text: distilledText,
+                    timestamp: audioPlayer.currentTime,
+                    sourceType: .bookmark,
+                    transcriptSnippet: snippet,
+                    questionText: nil
+                )
+
+                await MainActor.run {
+                    takeawayService.addTakeaway(takeaway)
+                    isBookmarking = false
+
+                    // Show toast
+                    withAnimation {
+                        showToast = true
+                    }
+
+                    // Haptic feedback
+                    let generator = UINotificationFeedbackGenerator()
+                    generator.notificationOccurred(.success)
+
+                    // Hide toast after 1.5 seconds
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        withAnimation {
+                            showToast = false
+                        }
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    isBookmarking = false
+                    print("Failed to distill takeaway: \(error)")
+                }
+            }
+        }
+    }
+
+    private func getTranscriptSnippet() -> String {
+        let transcript = audioPlayer.currentTranscript
+        guard !transcript.isEmpty else { return "" }
+
+        // Get ~300 chars around the current position
+        let totalDuration = audioPlayer.duration
+        guard totalDuration > 0 else { return String(transcript.prefix(300)) }
+
+        let progress = audioPlayer.currentTime / totalDuration
+        let estimatedPosition = Int(Double(transcript.count) * progress)
+
+        let start = max(0, estimatedPosition - 150)
+        let end = min(transcript.count, estimatedPosition + 150)
+
+        let startIndex = transcript.index(transcript.startIndex, offsetBy: start)
+        let endIndex = transcript.index(transcript.startIndex, offsetBy: end)
+
+        return String(transcript[startIndex..<endIndex])
+    }
 }
 
 #Preview {
     NowPlayingView()
         .environmentObject(AudioPlayerService())
+        .environment(TakeawayService())
 }

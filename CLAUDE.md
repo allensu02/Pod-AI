@@ -12,11 +12,11 @@ iOS podcast player with AI-powered voice interaction, built with SwiftUI.
 - **Podcast Search**: iTunes Search API to find any podcast
 - **Podcast Playback**: Full audio player with seek, skip (±15/30s), lock screen controls
 - **Auto-Transcription**: YouTube transcripts (free) with Whisper API fallback
-- **Voice Chat**: Ask questions about podcast content via voice (GPT-4o Realtime)
+- **Voice Chat**: Tap mic button to ask questions about podcast content via voice (GPT-4o Realtime)
 - **Voice Commands**: Say "go back to the podcast", "skip forward", "rewind" - AI executes via function calling
 - **Echo Cancellation**: Single AVAudioEngine with voice processing for clean audio
 - **Interruption Support**: Speak while AI is talking to interrupt and ask follow-up
-- **Modern UI**: Dark theme, mini player, Now Playing view, animated voice interaction, iOS 26 Liquid Glass
+- **Modern UI**: Dark theme, mini player, Now Playing view, animated mic button, iOS 26 Liquid Glass
 
 ## Architecture
 
@@ -46,6 +46,7 @@ Pod AI/
     ├── EpisodeRowView.swift       # Episode list item component
     └── Components/
         ├── SearchBarView.swift    # Liquid Glass search bar
+        ├── GlowyMicButton.swift   # Animated mic button for voice interaction
         ├── CategoryCardView.swift # Category card (unused)
         └── PodcastRowView.swift   # Search result row
 ```

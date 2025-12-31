@@ -10,11 +10,13 @@ import SwiftUI
 @main
 struct Pod_AIApp: App {
     @StateObject private var audioPlayer = AudioPlayerService()
+    @State private var takeawayService = TakeawayService()
 
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(audioPlayer)
+                .environment(takeawayService)
         }
     }
 }
