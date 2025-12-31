@@ -76,6 +76,5 @@ struct BrowseView: View {
     NavigationStack {
         BrowseView()
             .environmentObject(AudioPlayerService())
-            .environmentObject(WakeWordService())
     }
 }

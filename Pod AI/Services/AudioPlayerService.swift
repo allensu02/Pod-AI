@@ -21,8 +21,10 @@ class AudioPlayerService: ObservableObject {
     private var timeObserver: Any?
     private var cancellables = Set<AnyCancellable>()
     private let transcriptService = TranscriptService()
+    private var routeChangeObserver: NSObjectProtocol?
 
     init() {
+        setupRouteChangeObserver()
         setupAudioSession()
         setupRemoteCommands()
     }
@@ -31,6 +33,65 @@ class AudioPlayerService: ObservableObject {
         if let observer = timeObserver {
             player?.removeTimeObserver(observer)
         }
+        if let observer = routeChangeObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+    }
+
+    // MARK: - Audio Route Debugging
+
+    private func setupRouteChangeObserver() {
+        routeChangeObserver = NotificationCenter.default.addObserver(
+            forName: AVAudioSession.routeChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            self?.handleRouteChange(notification)
+        }
+    }
+
+    private func handleRouteChange(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let reasonValue = userInfo[AVAudioSessionRouteChangeReasonKey] as? UInt,
+              let reason = AVAudioSession.RouteChangeReason(rawValue: reasonValue) else {
+            return
+        }
+
+        let reasonString: String
+        switch reason {
+        case .newDeviceAvailable: reasonString = "🔌 New device available"
+        case .oldDeviceUnavailable: reasonString = "🔌 Old device unavailable"
+        case .categoryChange: reasonString = "🔄 Category changed"
+        case .override: reasonString = "⚡ Override"
+        case .wakeFromSleep: reasonString = "😴 Wake from sleep"
+        case .noSuitableRouteForCategory: reasonString = "❌ No suitable route"
+        case .routeConfigurationChange: reasonString = "🔧 Route config changed"
+        default: reasonString = "❓ Unknown reason (\(reasonValue))"
+        }
+
+        print("🔊 [ROUTE CHANGE] \(reasonString)")
+        logCurrentRoute(context: "after route change")
+    }
+
+    private func logCurrentRoute(context: String) {
+        let session = AVAudioSession.sharedInstance()
+        let route = session.currentRoute
+
+        print("📍 [AUDIO ROUTE] --- \(context) ---")
+        print("   Category: \(session.category.rawValue)")
+        print("   Mode: \(session.mode.rawValue)")
+        print("   Options: \(session.categoryOptions)")
+
+        print("   OUTPUTS:")
+        for output in route.outputs {
+            print("      → \(output.portType.rawValue) - \"\(output.portName)\"")
+        }
+
+        print("   INPUTS:")
+        for input in route.inputs {
+            print("      ← \(input.portType.rawValue) - \"\(input.portName)\"")
+        }
+        print("📍 [AUDIO ROUTE] --- end ---")
     }
 
     // MARK: - Audio Session
@@ -46,11 +107,18 @@ class AudioPlayerService: ObservableObject {
             try session.setCategory(
                 .playAndRecord,
                 mode: .default,
-                options: [.defaultToSpeaker, .allowAirPlay, .allowBluetoothHFP]
+                options: [.defaultToSpeaker, .allowAirPlay]
             )
+            logCurrentRoute(context: "after setCategory")
+
             try session.setActive(true)
+            logCurrentRoute(context: "after setActive")
+
+            try session.overrideOutputAudioPort(.speaker)
+            logCurrentRoute(context: "after overrideOutputAudioPort(.speaker)")
+
         } catch {
-            print("Failed to setup audio session: \(error)")
+            print("❌ Failed to setup audio session: \(error)")
         }
     }
 
@@ -78,9 +146,11 @@ class AudioPlayerService: ObservableObject {
                 if status == .readyToPlay {
                     self?.isLoading = false
                     self?.duration = playerItem.duration.seconds.isNaN ? episode.duration : playerItem.duration.seconds
+                    self?.logCurrentRoute(context: "before play()")
                     self?.player?.play()
                     self?.isPlaying = true
                     self?.updateNowPlayingInfo()
+                    self?.logCurrentRoute(context: "after play()")
                 }
             }
             .store(in: &cancellables)

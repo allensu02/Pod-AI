@@ -94,5 +94,4 @@ struct MiniPlayerView: View {
     }
     .background(Color.black)
     .environmentObject(AudioPlayerService())
-    .environmentObject(WakeWordService())
 }

@@ -372,24 +372,13 @@ class OpenAIRealtimeService: NSObject, ObservableObject {
         // Only set up once
         guard audioEngine == nil else { return }
 
-        // Configure audio session for simultaneous recording and playback
-        do {
-            let session = AVAudioSession.sharedInstance()
-
-            print("🎙️ [DEBUG] Current audio session category: \(session.category.rawValue)")
-            print("🎙️ [DEBUG] Switching to playAndRecord mode...")
-
-            // First deactivate, then set category, then reactivate
-            // This helps iOS properly transition between audio modes
-            try session.setActive(false, options: .notifyOthersOnDeactivation)
-
-
-
-            print("🎙️ [DEBUG] Audio session configured successfully")
-        } catch {
-            print("❌ [DEBUG] Audio session setup error: \(error)")
-            return
-        }
+        // Log current audio route before doing anything
+        let session = AVAudioSession.sharedInstance()
+        print("🎙️ [REALTIME] setupAudioEngine called")
+        print("🎙️ [REALTIME] Current category: \(session.category.rawValue)")
+        print("🎙️ [REALTIME] Current mode: \(session.mode.rawValue)")
+        print("🎙️ [REALTIME] Current route outputs: \(session.currentRoute.outputs.map { $0.portType.rawValue })")
+        print("🎙️ [REALTIME] Current route inputs: \(session.currentRoute.inputs.map { $0.portType.rawValue })")
 
         audioEngine = AVAudioEngine()
         guard let engine = audioEngine else { return }
@@ -398,6 +387,12 @@ class OpenAIRealtimeService: NSObject, ObservableObject {
         let inputNode = engine.inputNode
         do {
             try inputNode.setVoiceProcessingEnabled(true)
+            print("🎙️ [REALTIME] Voice processing enabled")
+            print("🎙️ [REALTIME] Route after voice processing: \(session.currentRoute.outputs.map { $0.portType.rawValue })")
+
+            // Voice processing switches to earpiece - force back to speaker
+            try AVAudioSession.sharedInstance().overrideOutputAudioPort(.speaker)
+            print("🎙️ [REALTIME] Re-applied speaker override after voice processing")
         } catch {
             print("Failed to enable voice processing: \(error)")
         }
@@ -425,6 +420,8 @@ class OpenAIRealtimeService: NSObject, ObservableObject {
         // Start the engine
         do {
             try engine.start()
+            print("🎙️ [REALTIME] Audio engine started")
+            print("🎙️ [REALTIME] Route after engine start: \(session.currentRoute.outputs.map { $0.portType.rawValue })")
         } catch {
             print("Audio engine start error: \(error)")
         }

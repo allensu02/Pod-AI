@@ -239,5 +239,4 @@ struct VoiceInteractionView: View {
 #Preview {
     VoiceInteractionView()
         .environmentObject(AudioPlayerService())
-        .environmentObject(WakeWordService())
 }

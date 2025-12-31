@@ -7,7 +7,6 @@ import SwiftUI
 
 struct NowPlayingView: View {
     @EnvironmentObject var audioPlayer: AudioPlayerService
-    @EnvironmentObject var wakeWordService: WakeWordService
     @Environment(\.dismiss) private var dismiss
     @StateObject private var realtimeService = OpenAIRealtimeService()
     @State private var isVoiceInteractionActive = false
@@ -167,9 +166,8 @@ struct NowPlayingView: View {
                                 .foregroundColor(.gray)
                         }
 
-                        // AI Voice Button - Glowy animated
+                        // AI Voice Button
                         GlowyMicButton(
-                            state: wakeWordService.state,
                             voiceState: realtimeService.voiceState,
                             isVoiceInteractionActive: isVoiceInteractionActive,
                             onTap: {
@@ -196,11 +194,6 @@ struct NowPlayingView: View {
                     }
                 }
         )
-        .onChange(of: wakeWordService.state) { _, newState in
-            if newState == .detected && !isVoiceInteractionActive {
-                startVoiceInteraction()
-            }
-        }
         .onAppear {
             setupFunctionCallHandler()
         }
@@ -223,9 +216,6 @@ struct NowPlayingView: View {
         print("🎙️ [NOW PLAYING] Starting voice interaction")
         isVoiceInteractionActive = true
 
-        // Pause wake word detection during voice interaction
-        wakeWordService.pauseListening()
-
         // Pause podcast
         audioPlayer.pause()
 
@@ -239,8 +229,11 @@ struct NowPlayingView: View {
 
         // Start listening after connection is established
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            print("🔍 [DEBUG] 0.5s timer fired, connectionState = \(realtimeService.connectionState)")
             if realtimeService.connectionState == .connected {
                 realtimeService.startListening { }
+            } else {
+                print("❌ [DEBUG] Not connected after 0.5s, skipping startListening")
             }
         }
     }
@@ -254,9 +247,6 @@ struct NowPlayingView: View {
 
         // Resume podcast
         audioPlayer.resume()
-
-        // Resume wake word detection
-        wakeWordService.resumeListening()
     }
 
     private func handleFunctionCall(name: String, args: [String: Any]) {
@@ -290,5 +280,4 @@ struct NowPlayingView: View {
 #Preview {
     NowPlayingView()
         .environmentObject(AudioPlayerService())
-        .environmentObject(WakeWordService())
 }
